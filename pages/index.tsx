@@ -12,9 +12,12 @@ import erc20ABI from 'erc-20-abi';
 
 import DisplayPair from '../components/DisplayPair/DisplayPair';
 import objectHash from 'object-hash';
+import SimpleList from '../components/SimpleList/SimpleList';
 
 
 const baseURL = '/api/my-etherscan';
+
+const testNftAddress = "0x720a1f7ae2c4f9b876852bf14089696c3ee57b1d";
 
 const showNot = (msg, key='error') => {
   notification.open({
@@ -44,7 +47,9 @@ const Home: NextPage = () => {
 
 	const [balance, setBalance] = useState(0);
   const [readingNft, setReadingNft] = useState(false);
-  const [nfts, setNfts] = useState([]);
+  const [nfts, setNfts] = useState([]);//nfts from pool
+  const [minting, setMinting] = useState(false);
+  const [nftsList, setNftsList] = useState(false);//my nfts list
 
   async function getNftMetadata(nftAddress, id){
 
@@ -71,6 +76,82 @@ const Home: NextPage = () => {
       name, tokenURI, metadata
     }
 
+  }
+
+  async function getABI(contractAddress){
+    let { data: { result: contractABI } } = await axios.get(
+      baseURL, {
+      params: {
+        module: 'contract',
+        action: 'getabi',
+        address: contractAddress,
+      }
+    })
+    return JSON.parse(contractABI)
+  }
+
+  async function myNftsList(){
+    let nftABI = await getABI(testNftAddress) 
+    let nftContract = new web3Ref.current.eth.Contract(
+      nftABI,
+      testNftAddress
+    )
+
+    let ids = await nftContract.methods.walletOfOwner(accountRef.current).call()
+
+    let r = []
+
+    for(let i = 0; i < ids.length; i++){
+      const id = ids[i]
+      const tokenURI = await nftContract.methods.tokenURI(id).call()
+      let { data } = await axios.get(tokenURI)
+      r.push({
+       id, name: data.name, image: data.image
+      })
+    }
+
+    return r;
+
+  }
+
+  async function mint(nftAddress){
+
+    let nftABI = await getABI(nftAddress) 
+
+    let nftContract = new web3Ref.current.eth.Contract(
+      nftABI,
+      nftAddress
+    )
+
+    console.log("totalSupply", await nftContract.methods.totalSupply().call())
+    console.log("maxSupply", await nftContract.methods.maxSupply().call())
+
+    const params = [
+        {
+              from: accountRef.current,
+              to: nftAddress,
+              gas: '0x3be4c8',
+              data: nftContract.methods.mint(accountRef.current, 1).encodeABI(),
+            },
+    ];
+
+    const result = await ethereum
+      .request({
+        method: 'eth_sendTransaction',
+        params,
+      })
+
+    console.log(result);
+
+  }
+
+  function handleMintTestNft(){
+    setMinting(true)
+    mint(testNftAddress)
+      .then(function(){
+        setMinting(false)
+        myNftsList().then((_nfts) => setNftsList(_nfts))
+      })
   }
 
   async function readNft(){
@@ -234,9 +315,11 @@ const Home: NextPage = () => {
 
 				web3Ref.current = new Web3(provider);
 
-				window.ethereum
-					.request({ method: 'eth_accounts' })
-					.then(handleAccountsChanged)
+				let accounts = await window.ethereum.request({ method: 'eth_accounts' })
+				handleAccountsChanged(accounts)
+
+        let _nftsList = await myNftsList() 
+        setNftsList(_nftsList)
 
 				window.ethereum.on('chainChanged', handleChainChanged);
 
@@ -264,6 +347,11 @@ const Home: NextPage = () => {
         )} 
         </ul>
       }
+      <br/><br/>
+      <button onClick={ handleMintTestNft } disabled={ minting }>
+        { minting ? "minting ..." : "3.mint test nft to your own wallet" }
+      </button>
+      <SimpleList data={ nftsList }/>
     </div>
   )
 }
