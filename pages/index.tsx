@@ -6,6 +6,10 @@ import { notification } from 'antd';
 import Web3 from 'web3';
 import SeacowsPairABI from '../lib/abi/SeacowsPair/SeacowsPair.json';
 
+import txDecoder from 'ethereum-tx-decoder';
+import axios from 'axios';
+import erc20ABI from 'erc-20-abi';
+
 const showNot = (msg, key='error') => {
   notification.open({
     message: '',
@@ -59,6 +63,60 @@ const Home: NextPage = () => {
       );
 
       let factory = await seacowsPairContractRef.current.methods.factory().call()
+
+      console.log("factory", factory)
+
+      const etherscanApiKey = 'IIUJUZDGQ8H2TUH3SASM37N8FSU2JMWWM7'
+
+      const baseURL = 'https://api-rinkeby.etherscan.io/api'
+
+      let { data: { result } } = await axios.get(
+        baseURL, {
+        params: {
+          module: 'account',
+          action: 'txlist',
+          address: factory,
+          startblock: 0,
+          endblock: 99999999,
+          page: 1,
+          offset: 20,
+          sort: 'desc',
+          apikey: etherscanApiKey
+        }
+      })
+
+      //tokony sarahana ny traitement-n'ny PAIRERC20 sy PAIRETH
+      result = result.filter(({functionName, isError}) => 
+        (functionName.startsWith('createPairERC20') || functionName.startsWith('createPairETH')) && 
+        isError === "0"
+      )
+
+      let example = result[0];
+
+      let { data: { result: factoryABI } } = await axios.get(
+        baseURL, {
+        params: {
+          module: 'contract',
+          action: 'getabi',
+          address: factory,
+          apikey: etherscanApiKey
+        }
+      })
+
+      factoryABI = JSON.parse(factoryABI)
+
+      let fnDecoder = new txDecoder.FunctionDecoder(factoryABI);
+
+      let decodedInput = fnDecoder.decodeFn(example.input);
+
+      //ho an'ny ERC20 ihany vao misy ny params
+      console.log(decodedInput);
+
+      //console.log(decodedInput.params.nft);
+      const token = new web3Ref.current.eth.Contract(erc20ABI, decodedInput.params.token)
+       
+      console.log("symbol", await token.methods.symbol().call()) // prints the token's symbol
+      console.log("name", await token.methods.name().call()) // prints the token's name
 
 
 		}
