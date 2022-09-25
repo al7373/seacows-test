@@ -114,6 +114,34 @@ const Home: NextPage = () => {
 
   }
 
+  async function approve(id, swapContractAddress){
+
+    let nftABI = await getABI(testNftAddress) 
+
+    let nftContract = new web3Ref.current.eth.Contract(
+      nftABI,
+      testNftAddress
+    )
+
+    const params = [
+        {
+              from: accountRef.current,
+              to: testNftAddress,
+              gas: '0x3be4c8',
+              data: nftContract.methods.approve(swapContractAddress, id).encodeABI(),
+            },
+    ];
+
+    const result = await window.ethereum
+      .request({
+        method: 'eth_sendTransaction',
+        params,
+      })
+
+    console.log("approve result", result)
+
+  }
+
   async function mint(nftAddress){
 
     let nftABI = await getABI(nftAddress) 
@@ -135,7 +163,7 @@ const Home: NextPage = () => {
             },
     ];
 
-    const result = await ethereum
+    const result = await window.ethereum
       .request({
         method: 'eth_sendTransaction',
         params,
@@ -303,6 +331,11 @@ const Home: NextPage = () => {
 			});
   }
 
+  function handleApprove(id){
+    approve(id, '0x927967C413c385c097259dc7a51203a027750d9d')
+      .then(function(){})
+  }
+
 	useEffect(function(){
 
 		(async function(){
@@ -351,7 +384,10 @@ const Home: NextPage = () => {
       <button onClick={ handleMintTestNft } disabled={ minting }>
         { minting ? "minting ..." : "3.mint test nft to your own wallet" }
       </button>
-      <SimpleList data={ nftsList }/>
+      <SimpleList 
+        data={ nftsList }
+        onApprove={ handleApprove }
+      />
     </div>
   )
 }
