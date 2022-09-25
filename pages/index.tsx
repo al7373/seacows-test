@@ -66,9 +66,8 @@ const Home: NextPage = () => {
 
       console.log("factory", factory)
 
-      const etherscanApiKey = 'IIUJUZDGQ8H2TUH3SASM37N8FSU2JMWWM7'
 
-      const baseURL = 'https://api-rinkeby.etherscan.io/api'
+      const baseURL = '/api/my-etherscan'
 
       let { data: { result } } = await axios.get(
         baseURL, {
@@ -81,7 +80,6 @@ const Home: NextPage = () => {
           page: 1,
           offset: 20,
           sort: 'desc',
-          apikey: etherscanApiKey
         }
       })
 
@@ -99,7 +97,6 @@ const Home: NextPage = () => {
           module: 'contract',
           action: 'getabi',
           address: factory,
-          apikey: etherscanApiKey
         }
       })
 
