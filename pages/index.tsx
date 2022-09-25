@@ -13,6 +13,9 @@ import erc20ABI from 'erc-20-abi';
 import DisplayPair from '../components/DisplayPair/DisplayPair';
 import objectHash from 'object-hash';
 
+
+const baseURL = '/api/my-etherscan';
+
 const showNot = (msg, key='error') => {
   notification.open({
     message: '',
@@ -43,6 +46,33 @@ const Home: NextPage = () => {
   const [readingNft, setReadingNft] = useState(false);
   const [nfts, setNfts] = useState([]);
 
+  async function getNftMetadata(nftAddress, id){
+
+    let { data: { result: nftABI } } = await axios.get(
+      baseURL, {
+      params: {
+        module: 'contract',
+        action: 'getabi',
+        address: nftAddress,
+      }
+    })
+
+    let nftContract = new web3Ref.current.eth.Contract(
+      JSON.parse(nftABI),
+      nftAddress
+    )
+
+    const name = await nftContract.methods.name().call()
+    const tokenURI = await nftContract.methods.tokenURI(id).call()
+
+    let { data: metadata } = await axios.get(tokenURI)
+
+    return {
+      name, tokenURI, metadata
+    }
+
+  }
+
   async function readNft(){
 
       let seacowsPairContract = new web3Ref.current.eth.Contract(
@@ -54,7 +84,6 @@ const Home: NextPage = () => {
 
       console.log("factory", factory)
 
-      const baseURL = '/api/my-etherscan'
 
       let { data: { result } } = await axios.get(
         baseURL, {
@@ -65,7 +94,7 @@ const Home: NextPage = () => {
           startblock: 0,
           endblock: 99999999,
           page: 1,
-          offset: 20,
+          offset: 10,
           sort: 'desc',
         }
       })
@@ -88,6 +117,8 @@ const Home: NextPage = () => {
         isError === "0"
       )
 
+      result.splice(2)//deletes other results otherwise takes a long time. only 2 nfts.
+
       let endResults = [];
 
       for(let i = 0; i < result.length; i++){
@@ -99,29 +130,40 @@ const Home: NextPage = () => {
 
           const token = new web3Ref.current.eth.Contract(erc20ABI, decodedInput.params.token)
 
-          endResults.push({
-            "key": objectHash(decodedInput),
-            "initialNftIds": decodedInput.params.initialNFTIDs,
-            "nft": decodedInput.params.nft,
-            "correspondingToken": {
-              "symbol": await token.methods.symbol().call(),
-              "name": await token.methods.name().call(),
-            }
-          })
+          
+          for(let i = 0; i < decodedInput.params.initialNFTIDs.length; i++){
+            const nftId = decodedInput.params.initialNFTIDs[i];
+            const metadata = await getNftMetadata(decodedInput.params.nft, nftId)
+            endResults.push({
+              "key": objectHash(decodedInput) + "_" + nftId,
+              "nftId": nftId,
+              "nft": decodedInput.params.nft,
+              "nftMetadata": metadata,
+              "correspondingToken": {
+                "symbol": await token.methods.symbol().call(),
+                "name": await token.methods.name().call(),
+              }
+            })
+          }
 
         }
 
         if(example.functionName.startsWith('createPairETH')){
 
-          endResults.push({
-            "key": objectHash(decodedInput),
-            'initialNftIds': decodedInput._initialNFTIDs,
-            'nft': decodedInput._nft,
-            "correspondingToken": {
-              'symbol': 'ETH',
-              'name': 'Ethereum',
-            }
-          })
+          for(let i = 0; i < decodedInput._initialNFTIDs.length; i++){
+            const nftId = decodedInput._initialNFTIDs[i];
+            const metadata = await getNftMetadata(decodedInput._nft, nftId)
+            endResults.push({
+              "key": objectHash(decodedInput) + "_" + nftId,
+              'nftId': nftId,
+              'nft': decodedInput._nft,
+              "nftMetadata": metadata,
+              "correspondingToken": {
+                'symbol': 'ETH',
+                'name': 'Ethereum',
+              }
+            })
+          }
 
         }
 
