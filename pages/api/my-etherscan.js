@@ -37,6 +37,19 @@ export default async function handler(req, res) {
         }
       })
       break;
+    case 'logs':
+      r = await axios.get(
+        BASE_URL, {
+        params: {
+          module: query.module,
+          action: query.action,
+          fromBlock: query.fromBlock,
+          toBlock: query.toBlock,
+          address: query.address,
+          topic0: query.topic0,
+          apikey: ETHERSCAN_API_KEY 
+        }
+      })
     default:
   }
 
